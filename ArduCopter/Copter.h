@@ -217,6 +217,8 @@ public:
     friend class ModeAutorotate;
     friend class ModeTurtle;
 
+    friend class ModeNewMode;
+
     Copter(void);
 
 private:
@@ -982,6 +984,8 @@ private:
 #if MODE_TURTLE_ENABLED == ENABLED
     ModeTurtle mode_turtle;
 #endif
+
+    ModeNewMode mode_newmode;
 
     // mode.cpp
     Mode *mode_from_mode_num(const Mode::Number mode);
