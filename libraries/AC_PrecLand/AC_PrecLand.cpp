@@ -7,6 +7,7 @@
 #include "AC_PrecLand_IRLock.h"
 #include "AC_PrecLand_SITL_Gazebo.h"
 #include "AC_PrecLand_SITL.h"
+#include <AP_Logger/AP_Logger.h>
 #include <GCS_MAVLink/GCS.h>
 
 extern const AP_HAL::HAL& hal;
@@ -162,6 +163,13 @@ const AP_Param::GroupInfo AC_PrecLand::var_info[] = {
     // @Units: m
     AP_GROUPINFO("ALT_MAX", 16, AC_PrecLand, _sensor_max_alt, 8),
 
+    // @Param: OPTIONS
+    // @DisplayName: Precision Landing Extra Options
+    // @Description: Precision Landing Extra Options
+    // @Bitmask: 0: Moving Landing Target
+    // @User: Advanced
+    AP_GROUPINFO("OPTIONS", 17, AC_PrecLand, _options, 0),
+
     AP_GROUPEND
 };
 
@@ -195,7 +203,7 @@ void AC_PrecLand::init(uint16_t update_rate_hz)
 
     // create inertial history buffer
     // constrain lag parameter to be within bounds
-    _lag = constrain_float(_lag, 0.02f, 0.25f);
+    _lag.set(constrain_float(_lag, 0.02f, 0.25f));
 
     // calculate inertial buffer size from lag and minimum of main loop rate and update_rate_hz argument
     const uint16_t inertial_buffer_size = MAX((uint16_t)roundf(_lag * MIN(update_rate_hz, AP::scheduler().get_loop_rate_hz())), 1);
@@ -410,6 +418,31 @@ bool AC_PrecLand::get_target_velocity_relative_cms(Vector2f& ret)
     }
     ret = _target_vel_rel_out_NE*100.0f;
     return true;
+}
+
+// get the absolute velocity of the vehicle
+void AC_PrecLand::get_target_velocity_cms(const Vector2f& vehicle_velocity_cms, Vector2f& target_vel_cms)
+{
+    if (!(_options & PLND_OPTION_MOVING_TARGET)) {
+        // the target should not be moving
+        target_vel_cms.zero();
+        return;
+    }
+    if ((EstimatorType)_estimator_type.get() == EstimatorType::RAW_SENSOR) {
+        // We do not predict the velocity of the target in this case
+        // assume velocity to be zero
+        target_vel_cms.zero();
+        return;
+    }
+    Vector2f target_vel_rel_cms;
+    if (!get_target_velocity_relative_cms(target_vel_rel_cms)) {
+        // Don't know where the target is
+        // assume velocity to be zero
+        target_vel_cms.zero();
+        return;
+    }
+    // return the absolute velocity
+    target_vel_cms  = target_vel_rel_cms + vehicle_velocity_cms;
 }
 
 // handle_msg - Process a LANDING_TARGET mavlink message

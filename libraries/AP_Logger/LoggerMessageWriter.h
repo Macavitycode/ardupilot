@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AP_Logger_Backend.h"
+#include <AP_Rally/AP_Rally.h>
 
 class LoggerMessageWriter {
 public:
@@ -31,6 +32,7 @@ private:
     enum class Stage : uint8_t {
         FIRMWARE_STRING = 0,
         GIT_VERSIONS,
+        VER,  // i.e. the "VER" message
         SYSTEM_ID,
         PARAM_SPACE_USED,
         RC_PROTOCOL
@@ -138,6 +140,7 @@ private:
 
     AP_Param::ParamToken token;
     AP_Param *ap;
+    float param_default;
     enum ap_var_type type;
 
 

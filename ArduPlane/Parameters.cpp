@@ -618,7 +618,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @Param: LOG_BITMASK
     // @DisplayName: Log bitmask
     // @Description: Bitmap of what on-board log types to enable. This value is made up of the sum of each of the log types you want to be saved. It is usually best just to enable all log types by setting this to 65535. The individual bits are ATTITUDE_FAST=1, ATTITUDE_MEDIUM=2, GPS=4, PerformanceMonitoring=8, ControlTuning=16, NavigationTuning=32, Mode=64, IMU=128, Commands=256, Battery=512, Compass=1024, TECS=2048, Camera=4096, RCandServo=8192, Sonar=16384, Arming=32768, FullLogs=65535
-    // @Bitmask: 0:ATTITUDE_FAST,1:ATTITUDE_MED,2:GPS,3:PM,4:CTUN,5:NTUN,6:MODE,7:IMU,8:CMD,9:CURRENT,10:COMPASS,11:TECS,12:CAMERA,13:RC,14:SONAR,15:ARM/DISARM,19:IMU_RAW,20:ATTITUDE_FULLRATE,21:VideoStabilization
+    // @Bitmask: 0:ATTITUDE_FAST,1:ATTITUDE_MED,2:GPS,3:PM,4:CTUN,5:NTUN,6:MODE,7:IMU,8:CMD,9:BATT_MON,10:COMPASS,11:TECS,12:CAMERA,13:RC,14:RANGEFINDER,15:ARM/DISARM,19:IMU_RAW,20:ATTITUDE_FULLRATE,21:VideoStabilization
     // @User: Advanced
     GSCALAR(log_bitmask,            "LOG_BITMASK",    DEFAULT_LOG_BITMASK),
 
@@ -716,10 +716,10 @@ const AP_Param::Info Plane::var_info[] = {
 
     // @Param: RTL_AUTOLAND
     // @DisplayName: RTL auto land
-    // @Description: Automatically begin landing sequence after arriving at RTL location. This requires the addition of a DO_LAND_START mission item, which acts as a marker for the start of a landing sequence. The closest landing sequence will be chosen to the current location. 
-    // @Values: 0:Disable,1:Enable - go HOME then land,2:Enable - go directly to landing sequence
+    // @Description: Automatically begin landing sequence after arriving at RTL location. This requires the addition of a DO_LAND_START mission item, which acts as a marker for the start of a landing sequence. The closest landing sequence will be chosen to the current location. If this is set to 0 and there is a DO_LAND_START mission item then you will get an arming check failure. You can set to a value of 3 to avoid the arming check failure and use the DO_LAND_START for go-around without it changing RTL behaviour. For a value of 1 a rally point will be used instead of HOME if in range (see rally point documentation).
+    // @Values: 0:Disable,1:Fly HOME then land,2:Go directly to landing sequence, 3:OnlyForGoAround
     // @User: Standard
-    GSCALAR(rtl_autoland,         "RTL_AUTOLAND",   0),
+    GSCALAR(rtl_autoland,         "RTL_AUTOLAND",   float(RtlAutoland::RTL_DISABLE)),
 
     // @Param: CRASH_ACC_THRESH
     // @DisplayName: Crash Deceleration Threshold
@@ -924,7 +924,7 @@ const AP_Param::Info Plane::var_info[] = {
     GOBJECT(can_mgr,        "CAN_",       AP_CANManager),
 #endif
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+#if AP_SIM_ENABLED
     // @Group: SIM_
     // @Path: ../libraries/SITL/SITL.cpp
     GOBJECT(sitl, "SIM_", SITL::SIM),
@@ -949,12 +949,6 @@ const AP_Param::Info Plane::var_info[] = {
     // @Group: RALLY_
     // @Path: ../libraries/AP_Rally/AP_Rally.cpp
     GOBJECT(rally,  "RALLY_",       AP_Rally),
-
-#if AC_FENCE == ENABLED
-    // @Group: FENCE_
-    // @Path: ../libraries/AC_Fence/AC_Fence.cpp
-    GOBJECT(fence, "FENCE_",        AC_Fence),
-#endif
 
 #if HAL_NAVEKF2_AVAILABLE
     // @Group: EK2_
@@ -1016,9 +1010,11 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     AP_SUBGROUPPTR(button_ptr, "BTN_", 1, ParametersG2, AP_Button),
 #endif
 
+#if AP_ICENGINE_ENABLED
     // @Group: ICE_
     // @Path: ../libraries/AP_ICEngine/AP_ICEngine.cpp
     AP_SUBGROUPINFO(ice_control, "ICE_", 2, ParametersG2, AP_ICEngine),
+#endif
 
     // 3 was used by prototype for servo_channels
     
@@ -1082,7 +1078,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Param: FLIGHT_OPTIONS
     // @DisplayName: Flight mode options
     // @Description: Flight mode specific options
-    // @Bitmask: 0:Rudder mixing in direct flight modes only (Manual / Stabilize / Acro),1:Use centered throttle in Cruise or FBWB to indicate trim airspeed, 2:Disable attitude check for takeoff arming, 3:Force target airspeed to trim airspeed in Cruise or FBWB, 4: Climb to ALT_HOLD_RTL before turning for RTL, 5: Enable yaw damper in acro mode, 6: Surpress speed scaling during auto takeoffs to be 1 or less to prevent oscillations without airpseed sensor., 7:EnableDefaultAirspeed for takeoff, 8: Remove the TRIM_PITCH_CD on the GCS horizon, 9: Remove the TRIM_PITCH_CD on the OSD horizon, 10: Adjust mid-throttle to be TRIM_THROTTLE in non-auto throttle modes except MANUAL, 11:Disable suppression of fixed wing rate gains in ground mode
+    // @Bitmask: 0:Rudder mixing in direct flight modes only (Manual / Stabilize / Acro),1:Use centered throttle in Cruise or FBWB to indicate trim airspeed, 2:Disable attitude check for takeoff arming, 3:Force target airspeed to trim airspeed in Cruise or FBWB, 4: Climb to ALT_HOLD_RTL before turning for RTL, 5: Enable yaw damper in acro mode, 6: Surpress speed scaling during auto takeoffs to be 1 or less to prevent oscillations without airpseed sensor., 7:EnableDefaultAirspeed for takeoff, 8: Remove the TRIM_PITCH_CD on the GCS horizon, 9: Remove the TRIM_PITCH_CD on the OSD horizon, 10: Adjust mid-throttle to be TRIM_THROTTLE in non-auto throttle modes except MANUAL, 11:Disable suppression of fixed wing rate gains in ground mode, 12: Enable FBWB style loiter altitude control
     // @User: Advanced
     AP_GROUPINFO("FLIGHT_OPTIONS", 13, ParametersG2, flight_options, 0),
 
@@ -1229,12 +1225,21 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @User: Advanced
     // @Bitmask: 0: Servo 1, 1: Servo 2, 2: Servo 3, 3: Servo 4, 4: Servo 5, 5: Servo 6, 6: Servo 7, 7: Servo 8, 8: Servo 9, 9: Servo 10, 10: Servo 11, 11: Servo 12, 12: Servo 13, 13: Servo 14, 14: Servo 15
     AP_GROUPINFO("ONESHOT_MASK", 32, ParametersG2, oneshot_mask, 0),
+
+#if AP_SCRIPTING_ENABLED
+    // @Group: FOLL
+    // @Path: ../libraries/AP_Follow/AP_Follow.cpp
+    AP_SUBGROUPINFO(follow, "FOLL", 33, ParametersG2, AP_Follow),
+#endif
     
     AP_GROUPEND
 };
 
 ParametersG2::ParametersG2(void) :
-    ice_control(plane.rpm_sensor)
+    unused_integer{1}
+#if AP_ICENGINE_ENABLED
+    ,ice_control(plane.rpm_sensor)
+#endif
 #if HAL_SOARING_ENABLED
     ,soaring_controller(plane.TECS_controller, plane.aparm)
 #endif
@@ -1344,6 +1349,7 @@ void Plane::load_parameters(void)
         g.format_version.set_and_save(Parameters::k_format_version);
         hal.console->printf("done.\n");
     }
+    g.format_version.set_default(Parameters::k_format_version);
 
     uint32_t before = micros();
     // Load all auto-loaded EEPROM variables
@@ -1357,9 +1363,6 @@ void Plane::load_parameters(void)
     g2.servo_channels.set_default_function(CH_4, SRV_Channel::k_rudder);
         
     SRV_Channels::upgrade_parameters();
-
-    // possibly convert elevon and vtail mixers
-    convert_mixers();
 
 #if HAL_QUADPLANE_ENABLED
     if (quadplane.enable) {
@@ -1382,6 +1385,7 @@ void Plane::load_parameters(void)
         }
     }
 
+#if AP_FENCE_ENABLED
     enum ap_var_type ptype_fence_type;
     AP_Int8 *fence_type_new = (AP_Int8*)AP_Param::find("FENCE_TYPE", &ptype_fence_type);
     if (fence_type_new && !fence_type_new->configured()) {
@@ -1466,6 +1470,7 @@ void Plane::load_parameters(void)
             }
         }
     }
+#endif // AP_FENCE_ENABLED
 
 #if AP_TERRAIN_AVAILABLE
     g.terrain_follow.convert_parameter_width(AP_PARAM_INT8);
@@ -1489,6 +1494,7 @@ void Plane::load_parameters(void)
     }
 #endif
 
+#if AP_AIRSPEED_ENABLED
     // PARAMETER_CONVERSION - Added: Jan-2022
     {
         const uint16_t old_key = g.k_param_airspeed;
@@ -1496,116 +1502,30 @@ void Plane::load_parameters(void)
         const uint16_t old_top_element = 0; // Old group element in the tree for the first subgroup element (see AP_PARAM_KEY_DUMP)
         AP_Param::convert_class(old_key, &airspeed, airspeed.var_info, old_index, old_top_element, true);
     }
+#endif
+
+#if HAL_INS_NUM_HARMONIC_NOTCH_FILTERS > 1
+    if (!ins.harmonic_notches[1].params.enabled()) {
+        // notch filter parameter conversions (moved to INS_HNTC2) for 4.2.x, converted from fixed notch
+        const AP_Param::ConversionInfo notchfilt_conversion_info[] {
+            { Parameters::k_param_ins, 101, AP_PARAM_INT8,  "INS_HNTC2_ENABLE" },
+            { Parameters::k_param_ins, 293, AP_PARAM_FLOAT, "INS_HNTC2_ATT" },
+            { Parameters::k_param_ins, 357, AP_PARAM_FLOAT, "INS_HNTC2_FREQ" },
+            { Parameters::k_param_ins, 421, AP_PARAM_FLOAT, "INS_HNTC2_BW" },
+        };
+        uint8_t notchfilt_table_size = ARRAY_SIZE(notchfilt_conversion_info);
+        for (uint8_t i=0; i<notchfilt_table_size; i++) {
+            AP_Param::convert_old_parameters(&notchfilt_conversion_info[i], 1.0f);
+        }
+        AP_Param::set_default_by_name("INS_HNTC2_MODE", 0);
+        AP_Param::set_default_by_name("INS_HNTC2_HMNCS", 1);
+    }
+#endif // HAL_INS_NUM_HARMONIC_NOTCH_FILTERS
+    
+    // PARAMETER_CONVERSION - Added: Mar-2022
+#if AP_FENCE_ENABLED
+    AP_Param::convert_class(g.k_param_fence, &fence, fence.var_info, 0, 0, true);
+#endif
 
     hal.console->printf("load_all took %uus\n", (unsigned)(micros() - before));
-}
-
-/*
-  convert from old ELEVON_OUTPUT and VTAIL_OUTPUT mixers to function
-  based mixing
- */
-void Plane::convert_mixers(void)
-{
-    AP_Int8 elevon_output;
-    AP_Int8 vtail_output;
-    AP_Param::ConversionInfo elevon_info = {
-        Parameters::k_param_elevon_output,
-        0,
-        AP_PARAM_INT8,
-        nullptr
-    };
-    AP_Param::ConversionInfo vtail_info = {
-        Parameters::k_param_vtail_output,
-        0,
-        AP_PARAM_INT8,
-        nullptr
-    };
-    SRV_Channel *chan1 = SRV_Channels::srv_channel(CH_1);
-    SRV_Channel *chan2 = SRV_Channels::srv_channel(CH_2);
-    SRV_Channel *chan4 = SRV_Channels::srv_channel(CH_4);
-
-    if (AP_Param::find_old_parameter(&vtail_info, &vtail_output) &&
-        vtail_output.get() != 0 &&
-        chan2->get_function() == SRV_Channel::k_elevator &&
-        chan4->get_function() == SRV_Channel::k_rudder &&
-        !chan2->function_configured() &&
-        !chan4->function_configured()) {
-        hal.console->printf("Converting vtail_output %u\n", vtail_output.get());
-        switch (vtail_output) {
-        case MIXING_UPUP:
-        case MIXING_UPUP_SWP:
-            chan2->reversed_set_and_save_ifchanged(false);
-            chan4->reversed_set_and_save_ifchanged(false);
-            break;
-        case MIXING_UPDN:
-        case MIXING_UPDN_SWP:
-            chan2->reversed_set_and_save_ifchanged(false);
-            chan4->reversed_set_and_save_ifchanged(true);
-            break;
-        case MIXING_DNUP:
-        case MIXING_DNUP_SWP:
-            chan2->reversed_set_and_save_ifchanged(true);
-            chan4->reversed_set_and_save_ifchanged(false);
-            break;
-        case MIXING_DNDN:
-        case MIXING_DNDN_SWP:
-            chan2->reversed_set_and_save_ifchanged(true);
-            chan4->reversed_set_and_save_ifchanged(true);
-            break;
-        }
-        if (vtail_output < MIXING_UPUP_SWP) {
-            chan2->function_set_and_save(SRV_Channel::k_vtail_right);
-            chan4->function_set_and_save(SRV_Channel::k_vtail_left);
-        } else {
-            chan2->function_set_and_save(SRV_Channel::k_vtail_left);
-            chan4->function_set_and_save(SRV_Channel::k_vtail_right);
-        }
-    } else if (AP_Param::find_old_parameter(&elevon_info, &elevon_output) &&
-        elevon_output.get() != 0 &&
-        chan1->get_function() == SRV_Channel::k_aileron &&
-        chan2->get_function() == SRV_Channel::k_elevator &&
-        !chan1->function_configured() &&
-        !chan2->function_configured()) {
-        hal.console->printf("convert elevon_output %u\n", elevon_output.get());
-        switch (elevon_output) {
-        case MIXING_UPUP:
-        case MIXING_UPUP_SWP:
-            chan2->reversed_set_and_save_ifchanged(false);
-            chan1->reversed_set_and_save_ifchanged(false);
-            break;
-        case MIXING_UPDN:
-        case MIXING_UPDN_SWP:
-            chan2->reversed_set_and_save_ifchanged(false);
-            chan1->reversed_set_and_save_ifchanged(true);
-            break;
-        case MIXING_DNUP:
-        case MIXING_DNUP_SWP:
-            chan2->reversed_set_and_save_ifchanged(true);
-            chan1->reversed_set_and_save_ifchanged(false);
-            break;
-        case MIXING_DNDN:
-        case MIXING_DNDN_SWP:
-            chan2->reversed_set_and_save_ifchanged(true);
-            chan1->reversed_set_and_save_ifchanged(true);
-            break;
-        }
-        if (elevon_output < MIXING_UPUP_SWP) {
-            chan1->function_set_and_save(SRV_Channel::k_elevon_right);
-            chan2->function_set_and_save(SRV_Channel::k_elevon_left);
-        } else {
-            chan1->function_set_and_save(SRV_Channel::k_elevon_left);
-            chan2->function_set_and_save(SRV_Channel::k_elevon_right);
-        }
-    }
-
-    // convert any k_aileron_with_input to aileron and k_elevator_with_input to k_elevator
-    for (uint8_t i=0; i<NUM_SERVO_CHANNELS; i++) {
-        SRV_Channel *chan = SRV_Channels::srv_channel(i);
-        if (chan->get_function() == SRV_Channel::k_aileron_with_input) {
-            chan->function_set_and_save(SRV_Channel::k_aileron);
-        } else if (chan->get_function() == SRV_Channel::k_elevator_with_input) {
-            chan->function_set_and_save(SRV_Channel::k_elevator);
-        }
-    }
-    
 }

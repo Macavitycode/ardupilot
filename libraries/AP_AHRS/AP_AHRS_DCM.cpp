@@ -25,6 +25,8 @@
 #include <GCS_MAVLink/GCS.h>
 #include <AP_GPS/AP_GPS.h>
 #include <AP_Baro/AP_Baro.h>
+#include <AP_Compass/AP_Compass.h>
+#include <AP_Logger/AP_Logger.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -263,7 +265,10 @@ AP_AHRS_DCM::check_matrix(void)
         normalize();
 
         if (_dcm_matrix.is_nan() ||
-                fabsf(_dcm_matrix.c.x) > 10) {
+                fabsf(_dcm_matrix.c.x) > 10.0) {
+            // See Issue #20284: regarding the selection of 10.0 for DCM reset
+            // This won't be lowered without evidence of an issue or mathematical proof & testing of a lower bound
+
             // normalisation didn't fix the problem! We're
             // in real trouble. All we can do is reset
             //Serial.printf("ERROR: DCM matrix error. _dcm_matrix.c.x=%f\n",
@@ -582,7 +587,7 @@ AP_AHRS_DCM::drift_correction_yaw(void)
 
     // sanity check _kp_yaw
     if (_kp_yaw < AP_AHRS_YAW_P_MIN) {
-        _kp_yaw = AP_AHRS_YAW_P_MIN;
+        _kp_yaw.set(AP_AHRS_YAW_P_MIN);
     }
 
     // update the proportional control to drag the
@@ -922,7 +927,7 @@ AP_AHRS_DCM::drift_correction(float deltat)
 
     // sanity check _kp value
     if (_kp < AP_AHRS_RP_P_MIN) {
-        _kp = AP_AHRS_RP_P_MIN;
+        _kp.set(AP_AHRS_RP_P_MIN);
     }
 
     // we now want to calculate _omega_P and _omega_I. The
@@ -1044,7 +1049,7 @@ void AP_AHRS_DCM::estimate_wind(void)
 
 // return our current position estimate using
 // dead-reckoning or GPS
-bool AP_AHRS_DCM::get_position(struct Location &loc) const
+bool AP_AHRS_DCM::get_location(struct Location &loc) const
 {
     loc.lat = _last_lat;
     loc.lng = _last_lng;
@@ -1157,6 +1162,13 @@ bool AP_AHRS::set_home(const Location &loc)
         return false;
     }
 
+#if !APM_BUILD_TYPE(APM_BUILD_UNKNOWN)
+    if (!_home_is_set) {
+        // record home is set
+        AP::logger().Write_Event(LogEvent::SET_HOME);
+    }
+#endif
+
     _home = tmp;
     _home_is_set = true;
 
@@ -1239,7 +1251,7 @@ bool AP_AHRS_DCM::get_relative_position_NED_origin(Vector3f &posNED) const
         return false;
     }
     Location loc;
-    if (!AP_AHRS_DCM::get_position(loc)) {
+    if (!AP_AHRS_DCM::get_location(loc)) {
         return false;
     }
     posNED = origin.get_distance_NED(loc);

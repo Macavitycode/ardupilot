@@ -248,6 +248,9 @@ public:
     // posOffset is the XYZ flow sensor position in the body frame in m
     void writeOptFlowMeas(const uint8_t rawFlowQuality, const Vector2f &rawFlowRates, const Vector2f &rawGyroRates, const uint32_t msecFlowMeas, const Vector3f &posOffset);
 
+    // retrieve latest corrected optical flow samples (used for calibration)
+    bool getOptFlowSample(uint32_t& timeStamp_ms, Vector2f& flowRate, Vector2f& bodyRate, Vector2f& losPred) const;
+
     /*
      * Write body frame linear and angular displacement measurements from a visual odometry sensor
      *
@@ -300,7 +303,7 @@ public:
     * Write position and quaternion data from an external navigation system
     *
     * pos        : position in the RH navigation frame. Frame is assumed to be NED if frameIsNED is true. (m)
-    * quat       : quaternion desribing the the rotation from navigation frame to body frame
+    * quat       : quaternion desribing the rotation from navigation frame to body frame
     * posErr     : 1-sigma spherical position error (m)
     * angErr     : 1-sigma spherical angle error (rad)
     * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
@@ -980,6 +983,7 @@ private:
     bool hgtTimeout;                // boolean true if height measurements have failed innovation consistency check and timed out
     bool magTimeout;                // boolean true if magnetometer measurements have failed for too long and have timed out
     bool tasTimeout;                // boolean true if true airspeed measurements have failed for too long and have timed out
+    bool dragTimeout;               // boolean true if drag measurements have failed for too long and have timed out
     bool badIMUdata;                // boolean true if the bad IMU data is detected
     uint32_t badIMUdata_ms;         // time stamp bad IMU data was last detected
     uint32_t goodIMUdata_ms;        // time stamp good IMU data was last detected
@@ -1036,6 +1040,7 @@ private:
     uint32_t lastPosPassTime_ms;    // time stamp when GPS position measurement last passed innovation consistency check (msec)
     uint32_t lastHgtPassTime_ms;    // time stamp when height measurement last passed innovation consistency check (msec)
     uint32_t lastTasPassTime_ms;    // time stamp when airspeed measurement last passed innovation consistency check (msec)
+    uint32_t lastTasFailTime_ms;    // time stamp when airspeed measurement last failed innovation consistency check (msec)
     uint32_t lastTimeGpsReceived_ms;// last time we received GPS data
     uint32_t timeAtLastAuxEKF_ms;   // last time the auxiliary filter was run to fuse range or optical flow measurements
     uint32_t lastHealthyMagTime_ms; // time the magnetometer was last declared healthy
@@ -1158,13 +1163,17 @@ private:
 
     // variable used by the in-flight GPS quality check
     bool gpsSpdAccPass;             // true when reported GPS speed accuracy passes in-flight checks
+    bool gpsVertAccPass;            // true when reported GPS vertical accuracy passes in-flight checks
     bool ekfInnovationsPass;        // true when GPS innovations pass in-flight checks
     ftype sAccFilterState1;         // state variable for LPF applied to reported GPS speed accuracy
     ftype sAccFilterState2;         // state variable for peak hold filter applied to reported GPS speed
     uint32_t lastGpsCheckTime_ms;   // last time in msec the GPS quality was checked
-    uint32_t lastInnovPassTime_ms;  // last time in msec the GPS innovations passed
-    uint32_t lastInnovFailTime_ms;  // last time in msec the GPS innovations failed
+    uint32_t lastGpsInnovPassTime_ms;  // last time in msec the GPS innovations passed
+    uint32_t lastGpsInnovFailTime_ms;  // last time in msec the GPS innovations failed
+    uint32_t lastGpsVertAccPassTime_ms;  // last time in msec the GPS vertical accuracy test passed
+    uint32_t lastGpsVertAccFailTime_ms;  // last time in msec the GPS vertical accuracy test failed
     bool gpsAccuracyGood;           // true when the GPS accuracy is considered to be good enough for safe flight.
+    bool gpsAccuracyGoodForAltitude; // true when the GPS accuracy is considered to be good enough to use it as an altitude source.
     Vector3F gpsVelInnov;           // gps velocity innovations
     Vector3F gpsVelVarInnov;        // gps velocity innovation variances
     uint32_t gpsVelInnovTime_ms;    // system time that gps velocity innovations were recorded (to detect timeouts)
@@ -1186,6 +1195,12 @@ private:
     ftype prevPosE;                 // east position at last measurement
     ftype varInnovRng;              // range finder observation innovation variance (m^2)
     ftype innovRng;                 // range finder observation innovation (m)
+    struct {
+        uint32_t timestamp_ms;      // system timestamp of last correct optical flow sample (used for calibration)
+        Vector2f flowRate;          // latest corrected optical flow flow rate (used for calibration)
+        Vector2f bodyRate;          // latest corrected optical flow body rate (used for calibration)
+        Vector2f losPred;           // EKF estimated component of flowRate that comes from vehicle movement (not rotation)
+    } flowCalSample;
 
     ftype hgtMea;                   // height measurement derived from either baro, gps or range finder data (m)
     bool inhibitGndState;           // true when the terrain position state is to remain constant
@@ -1309,6 +1324,7 @@ private:
 	Vector2F innovDragVar;	            // multirotor drag measurement innovation variance ((m/sec**2)**2)
 	Vector2F dragTestRatio;		        // drag innovation consistency check ratio
 #endif
+	uint32_t lastDragPassTime_ms;       // system time that drag samples were last successfully fused
     bool dragFusionEnabled;
 
     // height source selection logic

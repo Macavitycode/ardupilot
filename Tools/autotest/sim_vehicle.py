@@ -28,6 +28,7 @@ import shlex
 import binascii
 import math
 
+from pysim import util
 from pysim import vehicleinfo
 
 
@@ -268,7 +269,7 @@ def kill_tasks():
             'MAVProxy.exe',
             'runsim.py',
             'AntennaTracker.elf',
-            'scrimmage'
+            'scrimmage',
             'ardurover',
             'arduplane',
             'arducopter'
@@ -363,6 +364,15 @@ def do_build(opts, frame_options):
     if opts.sitl_32bit:
         cmd_configure.append("--sitl-32bit")
 
+    if opts.ubsan:
+        cmd_configure.append("--ubsan")
+
+    if opts.ubsan_abort:
+        cmd_configure.append("--ubsan-abort")
+
+    for nv in opts.define:
+        cmd_configure.append("--define=%s" % nv)
+
     pieces = [shlex.split(x) for x in opts.waf_configure_args]
     for piece in pieces:
         cmd_configure.extend(piece)
@@ -415,7 +425,7 @@ def get_user_locations_path():
     '''The user locations.txt file is located by default in
     $XDG_CONFIG_DIR/ardupilot/locations.txt. If $XDG_CONFIG_DIR is
     not defined, we look in $HOME/.config/ardupilot/locations.txt.  If
-    $HOME is not defined, we look in ./.config/ardpupilot/locations.txt.'''
+    $HOME is not defined, we look in ./.config/ardupilot/locations.txt.'''
 
     config_dir = os.environ.get(
         'XDG_CONFIG_DIR',
@@ -639,6 +649,7 @@ def start_vehicle(binary, opts, stuff, spawns=None):
             gdb_commands_file.write("b %s\n" % (breakpoint,))
         if opts.disable_breakpoints:
             gdb_commands_file.write("disable\n")
+        gdb_commands_file.write("set pagination off\n")
         if not opts.gdb_stopped:
             gdb_commands_file.write("r\n")
         gdb_commands_file.close()
@@ -683,7 +694,7 @@ def start_vehicle(binary, opts, stuff, spawns=None):
         paths = stuff["default_params_filename"]
         if not isinstance(paths, list):
             paths = [paths]
-        paths = [os.path.join(autotest_dir, x) for x in paths]
+        paths = [util.relcurdir(os.path.join(autotest_dir, x)) for x in paths]
         for x in paths:
             if not os.path.isfile(x):
                 print("The parameter file (%s) does not exist" % (x,))
@@ -901,6 +912,7 @@ vehicle_choices.append("Sub")  # should change to Sub at some stage
 vehicle_choices.append("copter")  # should change to ArduCopter at some stage
 vehicle_choices.append("plane")  # should change to ArduPlane at some stage
 vehicle_choices.append("sub")  # should change to Sub at some stage
+vehicle_choices.append("blimp")  # should change to Blimp at some stage
 
 parser.add_option("-v", "--vehicle",
                   type='choice',
@@ -958,6 +970,11 @@ group_build.add_option("", "--sitl-32bit",
                        action='store_true',
                        dest="sitl_32bit",
                        help="compile sitl using 32-bit")
+group_build.add_option("", "--configure-define",
+                       default=[],
+                       action='append',
+                       dest="define",
+                       help="create a preprocessor define")
 group_build.add_option("", "--rebuild-on-failure",
                        dest="rebuild_on_failure",
                        action='store_true',
@@ -979,6 +996,16 @@ group_build.add_option("", "--coverage",
                        action='store_true',
                        default=False,
                        help="use coverage build")
+group_build.add_option("", "--ubsan",
+                       default=False,
+                       action='store_true',
+                       dest="ubsan",
+                       help="compile sitl with undefined behaviour sanitiser")
+group_build.add_option("", "--ubsan-abort",
+                       default=False,
+                       action='store_true',
+                       dest="ubsan_abort",
+                       help="compile sitl with undefined behaviour sanitiser and abort on error")
 parser.add_option_group(group_build)
 
 group_sim = optparse.OptionGroup(parser, "Simulation options")
@@ -1304,6 +1331,7 @@ vehicle_map = {
     "copter": "ArduCopter",  # will switch eventually
     "plane": "ArduPlane",  # will switch eventually
     "sub": "ArduSub",  # will switch eventually
+    "blimp" : "Blimp", # will switch eventually
 }
 if cmd_opts.vehicle in vehicle_map:
     progress("%s is now known as %s" %

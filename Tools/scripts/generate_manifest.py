@@ -30,6 +30,9 @@ brand_map = {
     'KakuteF7' : ('KakuteF7', 'Holybro'),
     'KakuteF7Mini' : ('KakuteF7Mini', 'Holybro'),
     'KakuteF4Mini' : ('KakuteF4Mini', 'Holybro'),
+    'KakuteH7Mini' : ('KakuteH7Mini', 'Holybro'),
+    'KakuteH7' : ('KakuteH7', 'Holybro'),
+    'KakuteH7-bdshot' : ('KakuteH7', 'Holybro'),
     'CubeBlack' : ('CubeBlack', 'Hex/ProfiCNC'),
     'CubeYellow' : ('CubeYellow', 'Hex/ProfiCNC'),
     'CubeOrange' : ('CubeOrange', 'Hex/ProfiCNC'),
@@ -75,14 +78,18 @@ brand_map = {
     'speedybeef4' : ('SpeedyBee F4', 'SpeedyBee'),
     'QioTekZealotF427' : ('ZealotF427', 'QioTek'),
     'BeastH7' : ('Beast H7 55A AIO', 'iFlight'),
+    'BeastH7v2' : ('Beast H7 v2 55A AIO', 'iFlight'),
     'BeastF7' : ('Beast F7 45A AIO', 'iFlight'),
     'BeastF7v2' : ('Beast F7 v2 55A AIO', 'iFlight'),
     'MambaF405US-I2C' : ('Diatone Mamba Basic F405 MK3/MK3.5', 'Diatone'),
+    'MambaF405-2022' : ('Diatone Mamba Basic F405 MK4', 'Diatone'),
+    'MambaH743v4' : ('Diatone Mamba H743 MK4', 'Diatone'),
     "FlywooF745" : ('Flywoo Goku GN 745 AIO', 'Flywoo'),
     "FlywooF745Nano" : ('Flywoo Goku Hex F745', 'Flywoo'),
     "modalai_fc-v1" : ('ModalAI FlightCore v1', 'ModalAI'),
     'Pixhawk5X' : ('Pixhawk 5X', 'Holybro'),
     "AIRLink" : ("Sky-Drones Technologies", "AIRLink"),
+    "SPRacingH7" : ("Seriously Pro Racing", "H7 Extreme"),
 }
 
 class Firmware():

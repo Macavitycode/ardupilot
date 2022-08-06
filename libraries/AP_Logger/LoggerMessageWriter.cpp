@@ -50,7 +50,8 @@ void LoggerMessageWriter_DFLogStart::reset()
     _next_unit_to_send = 0;
     _next_multiplier_to_send = 0;
     _next_format_unit_to_send = 0;
-    ap = AP_Param::first(&token, &type);
+    param_default = AP::logger().quiet_nanf();
+    ap = AP_Param::first(&token, &type, &param_default);
 }
 
 bool LoggerMessageWriter_DFLogStart::out_of_time_for_writing_messages() const
@@ -87,10 +88,11 @@ void LoggerMessageWriter_DFLogStart::process()
 
     case Stage::PARMS:
         while (ap) {
-            if (!_logger_backend->Write_Parameter(ap, token, type)) {
+            if (!_logger_backend->Write_Parameter(ap, token, type, param_default)) {
                 return;
             }
-            ap = AP_Param::next_scalar(&token, &type);
+            param_default = AP::logger().quiet_nanf();
+            ap = AP_Param::next_scalar(&token, &type, &param_default);
         }
 
         _params_done = true;
@@ -242,9 +244,16 @@ void LoggerMessageWriter_WriteSysInfo::process() {
                 return; // call me again
             }
         }
-        stage = Stage::SYSTEM_ID;
+        stage = Stage::VER;
         FALLTHROUGH;
 
+    case Stage::VER: {
+        if (!_logger_backend->Write_VER()) {
+            return;
+        }
+        stage = Stage::SYSTEM_ID;
+        FALLTHROUGH;
+    }
     case Stage::SYSTEM_ID:
         char sysid[40];
         if (hal.util->get_system_id(sysid)) {

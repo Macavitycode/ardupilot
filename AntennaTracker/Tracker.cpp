@@ -81,9 +81,6 @@ void Tracker::get_scheduler_tasks(const AP_Scheduler::Task *&tasks,
 
 void Tracker::one_second_loop()
 {
-    // make it possible to change orientation at runtime
-    ahrs.update_orientation();
-
     // sync MAVLink system ID
     mavlink_system.sysid = g.sysid_this_mav;
 
@@ -96,7 +93,7 @@ void Tracker::one_second_loop()
     if (!ahrs.home_is_set()) {
         // set home to current location
         Location temp_loc;
-        if (ahrs.get_position(temp_loc)) {
+        if (ahrs.get_location(temp_loc)) {
             if (!set_home(temp_loc)){
                 // fail silently
             }

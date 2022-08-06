@@ -16,12 +16,13 @@
  */
 
 /*
- *  NavEKF based AHRS (Attitude Heading Reference System) interface for
+ *  AHRS (Attitude Heading Reference System) frontend interface for
  *  ArduPilot
  *
  */
 
-#include <AP_HAL/AP_HAL.h>
+#include <AP_HAL/AP_HAL_Boards.h>
+#include <AP_HAL/Semaphores.h>
 
 #ifndef HAL_NAVEKF2_AVAILABLE
 // only default to EK2 enabled on boards with over 1M flash
@@ -33,16 +34,12 @@
 #endif
 
 #ifndef AP_AHRS_SIM_ENABLED
-#define AP_AHRS_SIM_ENABLED (CONFIG_HAL_BOARD == HAL_BOARD_SITL)
+#define AP_AHRS_SIM_ENABLED AP_SIM_ENABLED
 #endif
-
-#include "AP_AHRS.h"
 
 #if AP_AHRS_SIM_ENABLED
 #include <SITL/SITL.h>
 #endif
-
-#include <AP_ExternalAHRS/AP_ExternalAHRS.h>
 
 #include <AP_NavEKF2/AP_NavEKF2.h>
 #include <AP_NavEKF3/AP_NavEKF3.h>
@@ -82,6 +79,8 @@ public:
         return _singleton;
     }
 
+    // periodically checks to see if we should update the AHRS
+    // orientation (e.g. based on the AHRS_ORIENTATION parameter)
     // allow for runtime change of orientation
     // this makes initial config easier
     void update_orientation();
@@ -105,7 +104,7 @@ public:
     void            reset();
 
     // dead-reckoning support
-    bool get_position(struct Location &loc) const;
+    bool get_location(struct Location &loc) const;
 
     // get latest altitude estimate above ground level in meters and validity flag
     bool get_hagl(float &hagl) const WARN_IF_UNUSED;
@@ -158,10 +157,7 @@ public:
 
     // return true if airspeed comes from an airspeed sensor, as
     // opposed to an IMU estimate
-    bool airspeed_sensor_enabled(void) const {
-        // FIXME: make this "using_airspeed_sensor"?
-        return dcm.airspeed_sensor_enabled();
-    }
+    bool airspeed_sensor_enabled(void) const;
 
     // return true if airspeed comes from a specific airspeed sensor, as
     // opposed to an IMU estimate
@@ -216,22 +212,22 @@ public:
 
     bool have_inertial_nav() const;
 
-    bool get_velocity_NED(Vector3f &vec) const;
+    bool get_velocity_NED(Vector3f &vec) const WARN_IF_UNUSED;
 
     // return the relative position NED to either home or origin
     // return true if the estimate is valid
-    bool get_relative_position_NED_home(Vector3f &vec) const;
-    bool get_relative_position_NED_origin(Vector3f &vec) const;
+    bool get_relative_position_NED_home(Vector3f &vec) const WARN_IF_UNUSED;
+    bool get_relative_position_NED_origin(Vector3f &vec) const WARN_IF_UNUSED;
 
     // return the relative position NE to either home or origin
     // return true if the estimate is valid
-    bool get_relative_position_NE_home(Vector2f &posNE) const;
-    bool get_relative_position_NE_origin(Vector2f &posNE) const;
+    bool get_relative_position_NE_home(Vector2f &posNE) const WARN_IF_UNUSED;
+    bool get_relative_position_NE_origin(Vector2f &posNE) const WARN_IF_UNUSED;
 
     // return the relative position down to either home or origin
     // baro will be used for the _home relative one if the EKF isn't
     void get_relative_position_D_home(float &posD) const;
-    bool get_relative_position_D_origin(float &posD) const;
+    bool get_relative_position_D_origin(float &posD) const WARN_IF_UNUSED;
 
     // Get a derivative of the vertical position in m/s which is kinematically consistent with the vertical position is required by some control loops.
     // This is different to the vertical velocity from the EKF which is not always consistent with the vertical position due to the various errors that are being corrected for.
@@ -239,6 +235,9 @@ public:
 
     // write optical flow measurements to EKF
     void writeOptFlowMeas(const uint8_t rawFlowQuality, const Vector2f &rawFlowRates, const Vector2f &rawGyroRates, const uint32_t msecFlowMeas, const Vector3f &posOffset);
+
+    // retrieve latest corrected optical flow samples (used for calibration)
+    bool getOptFlowSample(uint32_t& timeStamp_ms, Vector2f& flowRate, Vector2f& bodyRate, Vector2f& losPred) const;
 
     // write body odometry measurements to the EKF
     void writeBodyFrameOdom(float quality, const Vector3f &delPos, const Vector3f &delAng, float delTime, uint32_t timeStamp_ms, uint16_t delay_ms, const Vector3f &posOffset);
@@ -277,9 +276,6 @@ public:
     // get compass offset estimates
     // true if offsets are valid
     bool getMagOffsets(uint8_t mag_idx, Vector3f &magOffsets) const;
-
-    // check all cores providing consistent attitudes for prearm checks
-    bool attitudes_consistent(char *failure_msg, const uint8_t failure_msg_len) const;
 
     // return the amount of yaw angle change due to the last yaw angle reset in radians
     // returns the time of the last yaw angle reset or 0 if no reset has ever occurred
@@ -324,7 +320,7 @@ public:
     bool is_vibration_affected() const;
 
     // get_variances - provides the innovations normalised using the innovation variance where a value of 0
-    // indicates perfect consistency between the measurement and the EKF solution and a value of of 1 is the maximum
+    // indicates perfect consistency between the measurement and the EKF solution and a value of 1 is the maximum
     // inconsistency that will be accepted by the filter
     // boolean false is returned if variances are not available
     bool get_variances(float &velVar, float &posVar, float &hgtVar, Vector3f &magVar, float &tasVar) const;
@@ -375,11 +371,6 @@ public:
     // set and save the ALT_M_NSE parameter value
     void set_alt_measurement_noise(float noise);
 
-    // active EKF type for logging
-    uint8_t get_active_AHRS_type(void) const {
-        return uint8_t(active_EKF_type());
-    }
-
     // get the selected ekf type, for allocation decisions
     int8_t get_ekf_type(void) const {
         return _ekf_type;
@@ -427,7 +418,6 @@ public:
 
     // Logging functions
     void Log_Write_Home_And_Origin();
-    void Write_AHRS2(void) const;
     void Write_Attitude(const Vector3f &targets) const;
 
     enum class LogOriginType {
@@ -435,7 +425,6 @@ public:
         ahrs_home = 1
     };
     void Write_Origin(LogOriginType origin_type, const Location &loc) const; 
-    void Write_POS(void) const;
     void write_video_stabilisation() const;
 
     // return a smoothed and corrected gyro vector in radians/second
@@ -538,7 +527,7 @@ public:
 
     // convert a vector from body to earth frame
     Vector3f body_to_earth(const Vector3f &v) const {
-        return v * get_rotation_body_to_ned();
+        return get_rotation_body_to_ned() * v;
     }
 
     // convert a vector from earth to body frame
@@ -611,8 +600,8 @@ public:
         _vehicle_class = vclass;
     }
 
-    // get the view's rotation, or ROTATION_NONE
-    enum Rotation get_view_rotation(void) const;
+    // get the view
+    AP_AHRS_View *get_view(void) const { return _view; };
 
     // get access to an EKFGSF_yaw estimator
     const EKFGSF_yaw *get_yaw_estimator(void) const;
@@ -639,14 +628,6 @@ private:
     AP_Int8 _wind_max;
     AP_Int8 _board_orientation;
     AP_Int8 _ekf_type;
-    AP_Float _custom_roll;
-    AP_Float _custom_pitch;
-    AP_Float _custom_yaw;
-
-    /*
-     * support for custom AHRS orientation, replacing _board_orientation
-     */
-    Matrix3f _custom_rotation;
 
     /*
      * DCM-backend parameters; it takes references to these
@@ -685,6 +666,9 @@ private:
     bool always_use_EKF() const {
         return _ekf_flags & FLAG_ALWAYS_USE_EKF;
     }
+
+    // check all cores providing consistent attitudes for prearm checks
+    bool attitudes_consistent(char *failure_msg, const uint8_t failure_msg_len) const;
 
     /*
      * Attitude-related private methods and attributes:
@@ -787,6 +771,9 @@ private:
     Matrix3f _rotation_autopilot_body_to_vehicle_body;
     Matrix3f _rotation_vehicle_body_to_autopilot_body;
 
+    // last time orientation was updated from AHRS_ORIENTATION:
+    uint32_t last_orientation_update_ms;
+
     // updates matrices responsible for rotating vectors from vehicle body
     // frame to autopilot body frame from _trim variables
     void update_trim_rotation_matrices();
@@ -830,6 +817,11 @@ private:
      * updating derived values like sin_roll and sin_pitch.
      */
     void copy_estimates_from_backend_estimates(const AP_AHRS_Backend::Estimates &results);
+
+    // write out secondary estimates:
+    void Write_AHRS2(void) const;
+    // write POS (canonical vehicle position) message out:
+    void Write_POS(void) const;
 
 #if HAL_NMEA_OUTPUT_ENABLED
     class AP_NMEA_Output* _nmea_out;

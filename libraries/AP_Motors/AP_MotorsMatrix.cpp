@@ -117,7 +117,7 @@ void AP_MotorsMatrix::set_update_rate(uint16_t speed_hz)
     // record requested speed
     _speed_hz = speed_hz;
 
-    uint16_t mask = 0;
+    uint32_t mask = 0;
     for (uint8_t i = 0; i < AP_MOTORS_MAX_NUM_MOTORS; i++) {
         if (motor_enabled[i]) {
             mask |= 1U << i;
@@ -184,15 +184,15 @@ void AP_MotorsMatrix::output_to_motors()
 
 // get_motor_mask - returns a bitmask of which outputs are being used for motors (1 means being used)
 //  this can be used to ensure other pwm outputs (i.e. for servos) do not conflict
-uint16_t AP_MotorsMatrix::get_motor_mask()
+uint32_t AP_MotorsMatrix::get_motor_mask()
 {
-    uint16_t motor_mask = 0;
+    uint32_t motor_mask = 0;
     for (uint8_t i = 0; i < AP_MOTORS_MAX_NUM_MOTORS; i++) {
         if (motor_enabled[i]) {
             motor_mask |= 1U << i;
         }
     }
-    uint16_t mask = motor_mask_to_srv_channel_mask(motor_mask);
+    uint32_t mask = motor_mask_to_srv_channel_mask(motor_mask);
 
     // add parent's mask
     mask |= AP_MotorsMulticopter::get_motor_mask();
@@ -295,7 +295,7 @@ void AP_MotorsMatrix::output_armed_stabilizing()
 
     // calculate the maximum yaw control that can be used
     // todo: make _yaw_headroom 0 to 1
-    float yaw_allowed_min = (float)_yaw_headroom / 1000.0f;
+    float yaw_allowed_min = (float)_yaw_headroom * 0.001f;
 
     // increase yaw headroom to 50% if thrust boost enabled
     yaw_allowed_min = _thrust_boost_ratio * 0.5f + (1.0f - _thrust_boost_ratio) * yaw_allowed_min;
@@ -460,13 +460,8 @@ void AP_MotorsMatrix::check_for_failed_motor(float throttle_thrust_best_plus_adj
 // output_test_seq - spin a motor at the pwm value specified
 //  motor_seq is the motor's sequence number from 1 to the number of motors on the frame
 //  pwm value is an actual pwm value that will be output, normally in the range of 1000 ~ 2000
-void AP_MotorsMatrix::output_test_seq(uint8_t motor_seq, int16_t pwm)
+void AP_MotorsMatrix::_output_test_seq(uint8_t motor_seq, int16_t pwm)
 {
-    // exit immediately if not armed
-    if (!armed()) {
-        return;
-    }
-
     // loop through all the possible orders spinning any motors that match that description
     for (uint8_t i = 0; i < AP_MOTORS_MAX_NUM_MOTORS; i++) {
         if (motor_enabled[i] && _test_order[i] == motor_seq) {
@@ -1048,7 +1043,7 @@ void AP_MotorsMatrix::setup_motors(motor_frame_class frame_class, motor_frame_ty
                     add_motors(motors, ARRAY_SIZE(motors));
                     break;
                 }
-                case MOTOR_FRAME_TYPE_CW_X:
+                case MOTOR_FRAME_TYPE_CW_X: {
                     _frame_type_string = "CW_X";
                     static const AP_MotorsMatrix::MotorDef motors[] {
                         {   45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW,  1 },
@@ -1062,6 +1057,40 @@ void AP_MotorsMatrix::setup_motors(motor_frame_class frame_class, motor_frame_ty
                             };
                     add_motors(motors, ARRAY_SIZE(motors));
                     break;
+                }
+                // BF/X cinelifters using two 4-in-1 ESCs are quite common
+                // see: https://fpvfrenzy.com/betaflight-motor-order/
+                case MOTOR_FRAME_TYPE_BF_X: {
+                    _frame_type_string = "BF_X";
+                    static const AP_MotorsMatrix::MotorDef motors[] {
+                        {  135, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  3 },
+                        {   45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 1 },
+                        { -135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 5 },
+                        {  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  7 },
+                        {  135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 4 },
+                        {   45, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  2 },
+                        { -135, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  6 },
+                        {  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 8 },
+                    };
+                    add_motors(motors, ARRAY_SIZE(motors));
+                    break;
+                }
+                case MOTOR_FRAME_TYPE_BF_X_REV: {
+                    // betaflight octa quad X order, reversed motors
+                    _frame_type_string = "X_REV";
+                    static const AP_MotorsMatrix::MotorDef motors[] {
+                        {  135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 3 },
+                        {   45, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  1 },
+                        { -135, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  5 },
+                        {  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 7 },
+                        {  135, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  4 },
+                        {   45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 2 },
+                        { -135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 6 },
+                        {  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  8 },
+                    };
+                    add_motors(motors, ARRAY_SIZE(motors));
+                    break;
+                }
                 default:
                     // octaquad frame class does not support this frame type
                     _frame_type_string = "UNSUPPORTED";

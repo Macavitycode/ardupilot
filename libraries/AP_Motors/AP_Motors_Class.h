@@ -1,10 +1,9 @@
 #pragma once
 
 #include <AP_Common/AP_Common.h>
-#include <AP_Math/AP_Math.h>        // ArduPilot Mega Vector/Matrix math Library
-#include <AP_Notify/AP_Notify.h>      // Notify library
-#include <SRV_Channel/SRV_Channel.h>
+#include <AP_Math/AP_Math.h>
 #include <Filter/Filter.h>         // filter library
+#include <GCS_MAVLink/GCS_MAVLink.h>
 
 // offsets for motors in motor_out and _motor_filtered arrays
 #define AP_MOTORS_MOT_1 0U
@@ -22,26 +21,30 @@
 
 #define AP_MOTORS_MAX_NUM_MOTORS 12
 
+#ifndef AP_MOTORS_FRAME_DEFAULT_ENABLED
+#define AP_MOTORS_FRAME_DEFAULT_ENABLED 1
+#endif
+
 #ifndef AP_MOTORS_FRAME_QUAD_ENABLED
-#define AP_MOTORS_FRAME_QUAD_ENABLED 1
+#define AP_MOTORS_FRAME_QUAD_ENABLED AP_MOTORS_FRAME_DEFAULT_ENABLED
 #endif
 #ifndef AP_MOTORS_FRAME_HEXA_ENABLED
-#define AP_MOTORS_FRAME_HEXA_ENABLED 1
+#define AP_MOTORS_FRAME_HEXA_ENABLED AP_MOTORS_FRAME_DEFAULT_ENABLED
 #endif
 #ifndef AP_MOTORS_FRAME_OCTA_ENABLED
-#define AP_MOTORS_FRAME_OCTA_ENABLED 1
+#define AP_MOTORS_FRAME_OCTA_ENABLED AP_MOTORS_FRAME_DEFAULT_ENABLED
 #endif
 #ifndef AP_MOTORS_FRAME_DECA_ENABLED
-#define AP_MOTORS_FRAME_DECA_ENABLED 1
+#define AP_MOTORS_FRAME_DECA_ENABLED AP_MOTORS_FRAME_DEFAULT_ENABLED
 #endif
 #ifndef AP_MOTORS_FRAME_DODECAHEXA_ENABLED
-#define AP_MOTORS_FRAME_DODECAHEXA_ENABLED 1
+#define AP_MOTORS_FRAME_DODECAHEXA_ENABLED AP_MOTORS_FRAME_DEFAULT_ENABLED
 #endif
 #ifndef AP_MOTORS_FRAME_Y6_ENABLED
-#define AP_MOTORS_FRAME_Y6_ENABLED 1
+#define AP_MOTORS_FRAME_Y6_ENABLED AP_MOTORS_FRAME_DEFAULT_ENABLED
 #endif
 #ifndef AP_MOTORS_FRAME_OCTAQUAD_ENABLED
-#define AP_MOTORS_FRAME_OCTAQUAD_ENABLED 1
+#define AP_MOTORS_FRAME_OCTAQUAD_ENABLED AP_MOTORS_FRAME_DEFAULT_ENABLED
 #endif
 
 // motor update rate
@@ -214,11 +217,11 @@ public:
     // output_test_seq - spin a motor at the pwm value specified
     //  motor_seq is the motor's sequence number from 1 to the number of motors on the frame
     //  pwm value is an actual pwm value that will be output, normally in the range of 1000 ~ 2000
-    virtual void        output_test_seq(uint8_t motor_seq, int16_t pwm) = 0;
+    void                output_test_seq(uint8_t motor_seq, int16_t pwm);
 
     // get_motor_mask - returns a bitmask of which outputs are being used for motors (1 means being used)
     //  this can be used to ensure other pwm outputs (i.e. for servos) do not conflict
-    virtual uint16_t    get_motor_mask() = 0;
+    virtual uint32_t    get_motor_mask() = 0;
 
     // pilot input in the -1 ~ +1 range for roll, pitch and yaw. 0~1 range for throttle
     void                set_radio_passthrough(float roll_input, float pitch_input, float throttle_input, float yaw_input);
@@ -306,10 +309,10 @@ protected:
     float               _air_density_ratio;     // air density / sea level density - decreases in altitude
 
     // mask of what channels need fast output
-    uint16_t            _motor_fast_mask;
+    uint32_t            _motor_fast_mask;
 
     // mask of what channels need to use SERVOn_MIN/MAX for output mapping
-    uint16_t            _motor_pwm_range_mask;
+    uint32_t            _motor_pwm_range_mask;
     
     // pass through variables
     float _roll_radio_passthrough;     // roll input from pilot in -1 ~ +1 range.  used for setup and providing servo feedback while landed
@@ -341,6 +344,11 @@ protected:
 
     // return string corresponding to frame_type
     virtual const char* get_type_string() const { return ""; }
+
+    // output_test_seq - spin a motor at the pwm value specified
+    //  motor_seq is the motor's sequence number from 1 to the number of motors on the frame
+    //  pwm value is an actual pwm value that will be output, normally in the range of 1000 ~ 2000
+    virtual void _output_test_seq(uint8_t motor_seq, int16_t pwm) = 0;
 
 #if AP_SCRIPTING_ENABLED
     // Custom frame string set from scripting

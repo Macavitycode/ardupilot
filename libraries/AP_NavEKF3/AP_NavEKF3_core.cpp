@@ -226,6 +226,7 @@ void NavEKF3_core::InitialiseVariables()
     gpsNoiseScaler = 1.0f;
     hgtTimeout = true;
     tasTimeout = true;
+    dragTimeout = true;
     badIMUdata = false;
     badIMUdata_ms = 0;
     goodIMUdata_ms = 0;
@@ -293,9 +294,12 @@ void NavEKF3_core::InitialiseVariables()
     sAccFilterState1 = 0.0f;
     sAccFilterState2 = 0.0f;
     lastGpsCheckTime_ms = 0;
-    lastInnovPassTime_ms = 0;
-    lastInnovFailTime_ms = 0;
+    lastGpsInnovPassTime_ms = 0;
+    lastGpsInnovFailTime_ms = 0;
+    lastGpsVertAccPassTime_ms = 0;
+    lastGpsVertAccFailTime_ms = 0;
     gpsAccuracyGood = false;
+    gpsAccuracyGoodForAltitude = false;
     gpsloc_prev = {};
     gpsDriftNE = 0.0f;
     gpsVertVelFilt = 0.0f;
@@ -1945,7 +1949,7 @@ void NavEKF3_core::ConstrainVariances()
         zeroCols(P,13,15);
         zeroRows(P,13,15);
         for (uint8_t i=0; i<=2; i++) {
-            const uint8_t stateIndex = 1 + 13;
+            const uint8_t stateIndex = i + 13;
             P[stateIndex][stateIndex] = fmaxF(P[stateIndex][stateIndex], minStateVarTarget);
         }
     }
